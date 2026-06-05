@@ -1,6 +1,7 @@
 name: Package plugin
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "master", "v2", "v3", "nf/v3-api" ]
 
