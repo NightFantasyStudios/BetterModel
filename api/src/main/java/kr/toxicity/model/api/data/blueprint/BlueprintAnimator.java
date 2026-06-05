@@ -7,6 +7,7 @@
 
 package kr.toxicity.model.api.data.blueprint;
 
+import kr.toxicity.model.api.animation.AnimationChannel;
 import kr.toxicity.model.api.animation.AnimationIterator;
 import kr.toxicity.model.api.animation.AnimationKeyframe;
 import kr.toxicity.model.api.animation.AnimationProgress;
@@ -14,6 +15,7 @@ import kr.toxicity.model.api.animation.VectorPoint;
 import kr.toxicity.model.api.bone.BoneName;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -25,11 +27,13 @@ import java.util.stream.Stream;
  *
  * @param name the name of the bone this animator applies to
  * @param keyframe a list of animation movements representing the keyframes
+ * @param channels the transform channels explicitly keyed by this animator
  * @since 1.15.2
  */
 public record BlueprintAnimator(
     @NotNull BoneName name,
-    @NotNull AnimationKeyframe keyframe
+    @NotNull AnimationKeyframe keyframe,
+    @NotNull EnumSet<AnimationChannel> channels
 ) {
 
     /**

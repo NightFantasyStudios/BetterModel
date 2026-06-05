@@ -34,7 +34,7 @@ public final class AnimationStateHandler<T extends Timed> {
     private final PriorityMap<String, TreeIterator> animators = new PriorityMap<>();
 
     @Getter
-    private int delay = 1;
+    private int delay;
     private volatile TreeIterator currentIterator = null;
     private volatile T beforeKeyframe = null, afterKeyframe = null;
 
@@ -223,7 +223,7 @@ public final class AnimationStateHandler<T extends Timed> {
      * @return ticking frame
      */
     public float frame() {
-        return afterKeyframe != null ? MathUtil.MINECRAFT_TICKS_PER_SECOND * Tracker.MINECRAFT_TICK_MULTIPLIER * (currentIterator.time + MathUtil.FRAME_EPSILON) : 0F;
+        return afterKeyframe != null ? 20 * Tracker.MINECRAFT_TICK_MULTIPLIER * (currentIterator.time + MathUtil.FRAME_EPSILON) : 0F;
     }
 
     private class TreeIterator implements BooleanSupplier {
@@ -260,12 +260,12 @@ public final class AnimationStateHandler<T extends Timed> {
         public @NotNull T next() {
             if (!started) {
                 started = true;
-                time = (float) modifier.start() / MathUtil.MINECRAFT_TICKS_PER_SECOND;
+                time = (float) modifier.start() / 20;
                 return iterator.next();
             }
             if (!iterator.hasNext()) {
                 ended = true;
-                time = (float) modifier.end() / MathUtil.MINECRAFT_TICKS_PER_SECOND;
+                time = (float) modifier.end() / 20;
                 return previous;
             }
             var nxt = iterator.next();

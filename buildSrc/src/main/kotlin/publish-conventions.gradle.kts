@@ -41,7 +41,9 @@ dependencies {
 
 mavenPublishing {
     publishToMavenCentral()
-    signAllPublications()
+    if (providers.gradleProperty("nf.signPublications").map(String::toBoolean).orElse(false).get()) {
+        signAllPublications()
+    }
     coordinates("io.github.toxicity188", artifactBaseId, artifactVersion)
     configure(JavaLibrary(
         javadocJar = JavadocJar.Javadoc(),

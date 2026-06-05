@@ -13,6 +13,7 @@ import it.unimi.dsi.fastutil.objects.ObjectLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSortedSets;
 import kr.toxicity.model.api.BetterModel;
 import kr.toxicity.model.api.animation.*;
+import kr.toxicity.model.api.animation.layer.BoneAnimationLayerEngine;
 import kr.toxicity.model.api.data.blueprint.BlueprintAnimation;
 import kr.toxicity.model.api.data.blueprint.BlueprintElement;
 import kr.toxicity.model.api.data.blueprint.ModelBoundingBox;
@@ -468,6 +469,84 @@ public final class RenderedBone implements BoneEventHandler {
     }
 
     /**
+     * Replaces or creates a state-machine animation slot for this bone.
+     * <p>
+     * Slots are evaluated by ascending priority and merged by transform channel,
+     * allowing higher-priority states to replace only the keyed channels while
+     * preserving lower-priority pose data on the remaining channels.
+     * </p>
+     *
+     * <pre>{@code
+     * bone.setStateAnimationSlot("base", 0, animation, modifier);
+     * bone.setStateAnimationSlot("attack", 1, attackAnimation, modifier);
+     * }</pre>
+     *
+     * @param slotKey the stable slot identifier
+     * @param priority the slot priority (higher wins)
+     * @param animation the animation to play
+     * @param modifier the animation modifier
+     * @return true if the slot changed
+     * @since 3.0.2
+     */
+    public boolean setStateAnimationSlot(
+        @NotNull String slotKey,
+        int priority,
+        @NotNull BlueprintAnimation animation,
+        @NotNull AnimationModifier modifier
+    ) {
+        return setStateAnimationSlot(slotKey, priority, animation, modifier, null, null);
+    }
+
+    /**
+     * Replaces or creates a state-machine animation slot for this bone with slot-specific flags.
+     *
+     * @param slotKey the stable slot identifier
+     * @param priority the slot priority (higher wins)
+     * @param animation the animation to play
+     * @param modifier the animation modifier
+     * @param skipLastFrame true to avoid replaying the terminal frame during looping
+     * @param emptyZero true to treat missing channels as default zeroed transforms
+     * @return true if the slot changed
+     * @since 3.0.2
+     */
+    public boolean setStateAnimationSlot(
+        @NotNull String slotKey,
+        int priority,
+        @NotNull BlueprintAnimation animation,
+        @NotNull AnimationModifier modifier,
+        @Nullable Boolean skipLastFrame,
+        @Nullable Boolean emptyZero
+    ) {
+        return getOrCreateState(modifier.player()).setStateAnimationSlot(slotKey, priority, animation, modifier, skipLastFrame, emptyZero);
+    }
+
+    /**
+     * Stops a state-machine animation slot for this bone.
+     *
+     * @param slotKey the slot identifier
+     * @param force true to remove immediately, false to lerp out when possible
+     * @return true if the slot existed
+     * @since 3.0.2
+     */
+    public boolean stopStateAnimationSlot(@NotNull String slotKey, boolean force) {
+        var stopped = globalState.stopStateAnimationSlot(slotKey, force);
+        for (var state : perPlayerState.values()) {
+            stopped |= state.stopStateAnimationSlot(slotKey, force);
+        }
+        return stopped;
+    }
+
+    /**
+     * Clears all state-machine slots from this bone.
+     *
+     * @since 3.0.2
+     */
+    public void clearStateAnimationSlots() {
+        globalState.clearStateAnimationSlots();
+        perPlayerState.values().forEach(BoneStateHandler::clearStateAnimationSlots);
+    }
+
+    /**
      * Stops bone's animation
      * @param filter filter
      * @param name animation's name
@@ -548,6 +627,7 @@ public final class RenderedBone implements BoneEventHandler {
 
     final class BoneStateHandler {
 
+        private final BoneAnimationLayerEngine layerEngine = new BoneAnimationLayerEngine(name(), defaultFrame);
         private final @Nullable UUID uuid;
         private final Consumer<UUID> consumer;
 
@@ -559,6 +639,7 @@ public final class RenderedBone implements BoneEventHandler {
         //Flags
         private boolean firstTick = true;
         private boolean skipInterpolation = false;
+        private float stateMachineFrame = 0F;
         private final AtomicBoolean updateAfter = new AtomicBoolean();
         private final AtomicBoolean updateCurrent = new AtomicBoolean();
 
@@ -578,11 +659,68 @@ public final class RenderedBone implements BoneEventHandler {
             );
         }
 
+        boolean setStateAnimationSlot(
+            @NotNull String slotKey,
+            int priority,
+            @NotNull BlueprintAnimation animation,
+            @NotNull AnimationModifier modifier
+        ) {
+            return setStateAnimationSlot(slotKey, priority, animation, modifier, null, null);
+        }
+
+        boolean setStateAnimationSlot(
+            @NotNull String slotKey,
+            int priority,
+            @NotNull BlueprintAnimation animation,
+            @NotNull AnimationModifier modifier,
+            @Nullable Boolean skipLastFrame,
+            @Nullable Boolean emptyZero
+        ) {
+            var changed = layerEngine.setSlot(slotKey, priority, animation, modifier, skipLastFrame, emptyZero);
+            if (changed) {
+                updateAfter.set(true);
+                updateCurrent.set(true);
+            }
+            return changed;
+        }
+
+        boolean stopStateAnimationSlot(@NotNull String slotKey, boolean force) {
+            var changed = layerEngine.stopSlot(slotKey, force);
+            if (changed) {
+                updateAfter.set(true);
+                updateCurrent.set(true);
+            }
+            return changed;
+        }
+
+        void clearStateAnimationSlots() {
+            layerEngine.clearSlots();
+            stateMachineFrame = 0F;
+            updateAfter.set(true);
+            updateCurrent.set(true);
+        }
+
         @NotNull BoneMovement after() {
             if (!updateAfter.compareAndSet(true, false)) return after;
             var keyframe = state.afterKeyframe(AnimationProgress.EMPTY);
             var preventModifierUpdate = interpolationDuration() < 1;
-            var def = keyframe.animate(defaultFrame, after);
+            keyframe.animate(defaultFrame, after);
+            var baseSkipInterpolation = skipInterpolation;
+            var globalRotation = keyframe.globalRotation();
+            if (layerEngine.hasSlots()) {
+                var result = layerEngine.compose(
+                    after,
+                    keyframe.skipInterpolation(),
+                    globalRotation,
+                    state.frame() / (20F * Tracker.MINECRAFT_TICK_MULTIPLIER)
+                );
+                skipInterpolation = baseSkipInterpolation || result.skipInterpolation() || (parent != null && parent.state(uuid).skipInterpolation);
+                stateMachineFrame = result.frameDuration();
+                globalRotation = result.globalRotation();
+            } else {
+                stateMachineFrame = 0F;
+            }
+            var def = after;
             if (parent != null) {
                 var p = parent.state(uuid).after();
                 MathUtil.fma(
@@ -594,7 +732,7 @@ public final class RenderedBone implements BoneEventHandler {
                 def.scale().mul(p.scale());
                 def.rotation().set(parent.lastModifiedGlobalRot.invert(globalRotCache)
                     .mul(modifiedGlobalRot(preventModifierUpdate))
-                    .mul((keyframe.globalRotation() ? localRotCache.identity() : p.rotation().div(parent.lastModifiedLocalRot, localRotCache)).mul(def.rotation()))
+                    .mul((globalRotation ? localRotCache.identity() : p.rotation().div(parent.lastModifiedLocalRot, localRotCache)).mul(def.rotation()))
                     .mul(modifiedLocalRot(preventModifierUpdate))
                 );
             } else {
@@ -612,7 +750,9 @@ public final class RenderedBone implements BoneEventHandler {
                     perPlayerState.remove(uuid);
                     consumer.accept(uuid);
                 }
-            }) || firstTick;
+            });
+            var slotResult = layerEngine.tick();
+            result = result || slotResult || firstTick;
             if (result && updateAfter.compareAndSet(false, true)) {
                 lock.accessToWriteLock(() -> before.set(current));
                 updateCurrent.set(true);
@@ -627,6 +767,13 @@ public final class RenderedBone implements BoneEventHandler {
 
         private int interpolationDuration() {
             if (skipInterpolation) return 0;
+            if (layerEngine.hasSlots()) {
+                if (stateMachineFrame <= MathUtil.FLOAT_COMPARISON_EPSILON) {
+                    return 0;
+                }
+                var frame = 20F * stateMachineFrame;
+                return Math.max(1, Math.round(frame + MathUtil.FLOAT_COMPARISON_EPSILON));
+            }
             var frame = state.frame() / (float) Tracker.MINECRAFT_TICK_MULTIPLIER;
             return Math.round(frame + MathUtil.FLOAT_COMPARISON_EPSILON);
         }

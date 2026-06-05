@@ -8,6 +8,7 @@
 package kr.toxicity.model.api.data.blueprint;
 
 import it.unimi.dsi.fastutil.floats.*;
+import kr.toxicity.model.api.animation.AnimationChannel;
 import kr.toxicity.model.api.animation.VectorPoint;
 import kr.toxicity.model.api.bone.BoneName;
 import kr.toxicity.model.api.util.InterpolationUtil;
@@ -76,12 +77,21 @@ public final class AnimationGenerator {
                         v.scale(),
                         v.rotationGlobal(),
                         floatSet
-                    ))
+                    ),
+                    channels(v)
+                )
                 ),
             BlueprintAnimator::name
         );
     }
 
+    private static @NotNull EnumSet<AnimationChannel> channels(@NotNull BlueprintAnimator.AnimatorData data) {
+        var channels = EnumSet.noneOf(AnimationChannel.class);
+        if (!data.position().isEmpty()) channels.add(AnimationChannel.POSITION);
+        if (!data.rotation().isEmpty()) channels.add(AnimationChannel.ROTATION);
+        if (!data.scale().isEmpty()) channels.add(AnimationChannel.SCALE);
+        return channels;
+    }
     private AnimationGenerator(
         @NotNull Function<BlueprintElement.Group, BlueprintAnimator.AnimatorData> function,
         @NotNull List<BlueprintElement> children
