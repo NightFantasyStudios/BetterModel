@@ -53,7 +53,7 @@ mavenPublishing {
         name = artifactBaseId
         description = "Modern Bedrock model engine for Minecraft Java Edition"
         inceptionYear = "2024"
-        url = "https://github.com/toxicity188/BetterModel/"
+        url = "https://github.com/NightFantasyStudios/BetterModel/"
         licenses {
             license {
                 name = "MIT License"
@@ -64,13 +64,13 @@ mavenPublishing {
             developer {
                 id = "toxicity188"
                 name = "toxicity188"
-                url = "https://github.com/toxicity188/"
+                url = "https://github.com/NightFantasyStudios/"
             }
         }
         scm {
-            url = "https://github.com/toxicity188/BetterModel/"
-            connection = "scm:git:git://github.com/toxicity188/BetterModel.git"
-            developerConnection = "scm:git:ssh://git@github.com/toxicity188/BetterModel.git"
+            url = "https://github.com/NightFantasyStudios/BetterModel/"
+            connection = "scm:git:git://github.com/NightFantasyStudios/BetterModel.git"
+            developerConnection = "scm:git:ssh://git@github.com/NightFantasyStudios/BetterModel.git"
         }
     }
 }
@@ -79,10 +79,11 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/toxicity188/${rootProject.name}")
+            val githubRepository = System.getenv("GITHUB_REPOSITORY") ?: "NightFantasyStudios/${rootProject.name}"
+            url = uri("https://maven.pkg.github.com/$githubRepository")
             credentials {
-                username = "toxicity188"
-                password = System.getenv("PACKAGES_API_TOKEN")
+                username = System.getenv("GITHUB_ACTOR") ?: "NightFantasyStudios"
+                password = System.getenv("PACKAGES_API_TOKEN") ?: System.getenv("GITHUB_TOKEN")
             }
         }
     }
