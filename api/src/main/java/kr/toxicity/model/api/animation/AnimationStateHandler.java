@@ -17,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Iterator;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 
@@ -201,6 +202,55 @@ public final class AnimationStateHandler<T extends Timed> {
             animators.replace(name, v -> new TreeIterator(name, iterator, v.modifier.toBuilder()
                 .mergeNotDefault(modifier)
                 .build(), v.removeTask));
+        }
+    }
+
+    /**
+     * Adds or replaces an animation under a stable key.
+     *
+     * @param name stable animation key
+     * @param iterator animation iterator
+     * @param modifier animation modifier
+     * @param removeTask removal callback
+     * @return true if this call inserted a new key, false if it replaced an existing key
+     * @since 3.2.0-nf.1
+     */
+    public boolean upsertAnimation(@NotNull String name, @NotNull AnimationIterator<T> iterator, @NotNull AnimationModifier modifier, @NotNull Runnable removeTask) {
+        synchronized (animators) {
+            var exists = animators.containsKey(name);
+            if (exists) {
+                animators.replace(name, v -> new TreeIterator(name, iterator, v.modifier.toBuilder()
+                    .mergeNotDefault(modifier)
+                    .build(), v.removeTask));
+            } else {
+                animators.put(name, new TreeIterator(name, iterator, modifier, removeTask), modifier.priority());
+            }
+            return !exists;
+        }
+    }
+
+    /**
+     * Checks if an animation key exists.
+     *
+     * @param name animation key
+     * @return true if present
+     * @since 3.2.0-nf.1
+     */
+    public boolean hasAnimation(@NotNull String name) {
+        synchronized (animators) {
+            return animators.containsKey(name);
+        }
+    }
+
+    /**
+     * Returns an immutable snapshot of animation keys.
+     *
+     * @return animation key snapshot
+     * @since 3.2.0-nf.1
+     */
+    public @NotNull Set<String> animationNames() {
+        synchronized (animators) {
+            return animators.keySet();
         }
     }
 

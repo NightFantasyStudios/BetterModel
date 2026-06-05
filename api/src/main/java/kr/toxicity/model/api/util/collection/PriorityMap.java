@@ -89,6 +89,26 @@ public final class PriorityMap<K extends Comparable<K>, V> {
     }
 
     /**
+     * Checks whether this map contains a mapping for the specified key.
+     *
+     * @param key the key to check
+     * @return true if this map contains the key
+     * @since 3.2.0-nf.1
+     */
+    public boolean containsKey(@NotNull K key) {
+        return keyMap.containsKey(Objects.requireNonNull(key));
+    }
+
+    /**
+     * Returns an immutable snapshot of the keys in this map.
+     *
+     * @return immutable key snapshot
+     * @since 3.2.0-nf.1
+     */
+    public @NotNull Set<K> keySet() {
+        return Set.copyOf(keyMap.keySet());
+    }
+    /**
      * Removes the mapping for a key from this map if it is present.
      *
      * @param key key whose mapping is to be removed from the map

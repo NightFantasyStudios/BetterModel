@@ -611,6 +611,46 @@ public abstract class Tracker implements AutoCloseable {
         return pipeline.matchAnimation((b, a) -> b.replaceAnimation(a, target, animation, modifier));
     }
 
+    /**
+     * Adds or replaces only this tracker script animation under a stable key.
+     * <p>
+     * This is intended for systems that handle bone animation separately but still
+     * need BetterModel animation scripts/signals to follow the same stable slot.
+     * </p>
+     *
+     * @param target stable script animation key
+     * @param animation the source blueprint animation
+     * @param modifier the animation modifier
+     * @return true if a script existed and was added or replaced
+     * @since 3.2.0-nf.1
+     */
+    public boolean upsertScriptAnimation(@NotNull String target, @NotNull BlueprintAnimation animation, @NotNull AnimationModifier modifier) {
+        var script = animation.script(modifier);
+        if (script == null) return false;
+        scriptProcessor.upsertAnimation(target, script.iterator(modifier), modifier, () -> {});
+        return true;
+    }
+
+    /**
+     * Stops only this tracker's script animation for a stable key.
+     *
+     * @param target stable script animation key
+     * @return true if a script animation was removed
+     * @since 3.2.0-nf.1
+     */
+    public boolean stopScriptAnimation(@NotNull String target) {
+        return scriptProcessor.stopAnimation(target);
+    }
+
+    /**
+     * Returns a snapshot of active script animation keys.
+     *
+     * @return immutable script animation key snapshot
+     * @since 3.2.0-nf.1
+     */
+    public @NotNull Set<String> scriptAnimationNames() {
+        return scriptProcessor.animationNames();
+    }
     //--- Listener ---
 
     /**
